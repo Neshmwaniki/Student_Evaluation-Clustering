@@ -1,0 +1,191 @@
+---
+title: "Student Evaluation Clustering"
+author: "Denis Munene"
+date: ' `r as.Date(Sys.time())` '
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+---
+## R Markdown setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F, fig.width = 10, fig.height = 10)
+
+```
+
+## Import Libraries
+```{r}
+library(skimr)
+library(tidyverse)
+library(dplyr)
+library(haven)
+library(factoextra)
+```
+
+
+```{r, include=FALSE}
+## Load data
+
+setwd("C:/Users/dmunene/OneDrive - Dalberg Global Development Advisors/RESSOL/Personal/Data Analysis/Turkiye Student Evaluation")
+
+## Read data
+df <- read.csv("turkiye-student-evaluation_generic.csv")
+
+```
+
+## Data Context
+
+Attribute Information:
+
+instr: Instructor's identifier; values taken from {1,2,3} 
+class: Course code (descriptor); values taken from {1-13} 
+repeat: Number of times the student is taking this course; values taken from {0,1,2,3,...} 
+attendance: Code of the level of attendance; values from {0, 1, 2, 3, 4} 
+difficulty: Level of difficulty of the course as perceived by the student; values taken from {1,2,3,4,5} 
+Q1: The semester course content, teaching method and evaluation system were provided at the start. 
+Q2: The course aims and objectives were clearly stated at the beginning of the period. 
+Q3: The course was worth the amount of credit assigned to it. 
+Q4: The course was taught according to the syllabus announced on the first day of class. 
+Q5:	The class discussions, homework assignments, applications and studies were satisfactory. 
+Q6: The textbook and other courses resources were sufficient and up to date.	
+Q7: The course allowed field work, applications, laboratory, discussion and other studies. 
+Q8: The quizzes, assignments, projects and exams contributed to helping the learning.	
+Q9: I greatly enjoyed the class and was eager to actively participate during the lectures. 
+Q10: My initial expectations about the course were met at the end of the period or year. 
+Q11: The course was relevant and beneficial to my professional development. 
+Q12: The course helped me look at life and the world with a new perspective. 
+Q13: The Instructor's knowledge was relevant and up to date. 
+Q14: The Instructor came prepared for classes. 
+Q15: The Instructor taught in accordance with the announced lesson plan. 
+Q16: The Instructor was committed to the course and was understandable. 
+Q17: The Instructor arrived on time for classes. 
+Q18: The Instructor has a smooth and easy to follow delivery/speech. 
+Q19: The Instructor made effective use of class hours. 
+Q20: The Instructor explained the course and was eager to be helpful to students. 
+Q21: The Instructor demonstrated a positive approach to students. 
+Q22: The Instructor was open and respectful of the views of students about the course. 
+Q23: The Instructor encouraged participation in the course. 
+Q24: The Instructor gave relevant homework assignments/projects, and helped/guided students. 
+Q25: The Instructor responded to questions about the course inside and outside of the course. 
+Q26: The Instructor's evaluation system (midterm and final questions, projects, assignments, etc.) effectively measured the course objectives. 
+Q27: The Instructor provided solutions to exams and discussed them with students. 
+Q28: The Instructor treated all students in a right and objective manner. 
+
+Q1-Q28 are all Likert-type, meaning that the values are taken from {1,2,3,4,5}
+
+data source: http://archive.ics.uci.edu/ml/datasets/turkiye+student+evaluation 
+
+
+## Data Exploration
+```{r}
+skim(df)
+
+```
+
+### Visuals
+The graphs below illustrate the different relationships that could be explored from the dataset. Depending on the output, they offer an indication on possible links (influence) between variables in the dataset that can be further explored to offer more understanding about the students.
+
+#### Instructors
+```{r}
+instr <- ggplot(df,aes(instr))+theme_bw()+geom_bar(fill = "red")+coord_flip()
+instr
+
+```
+
+#### Class by Instructor
+```{r}
+clss <- ggplot(df,aes(class, fill = factor(instr)))+theme_bw()+geom_bar()+coord_flip()
+clss
+
+```
+
+#### Number of times Student taking course by Instructor
+```{r}
+rept <- ggplot(df,aes(nb.repeat, fill= factor(instr)))+theme_bw()+geom_bar()+coord_flip()
+rept
+
+
+```
+
+#### Level of attendance by Instructor
+```{r}
+att <- ggplot(df,aes(attendance,fill = factor(instr)))+theme_bw()+geom_bar()+coord_flip()
+att
+```
+
+#### Level of course difficulty by Instructor
+```{r}
+dif <- ggplot(df,aes(difficulty,fill = factor(instr)))+theme_bw()+geom_bar()+coord_flip()
+dif
+```
+
+## Dimensionality reduction in PCA
+
+Here we are seeking to find:
+ 1. Linear combination of the variables to create principal components
+ 2. Principal components that are uncorelated
+ 3. Most variance in the data
+
+```{r}
+## getting the different principal components of the key variables 
+pr.std <- prcomp(df[,6:33],scale = T,center = T)
+summary(pr.std)
+```
+
+### Bi plot
+
+A visual representation of the principal components.
+```{r}
+biplot(pr.std)
+```
+
+### Screeplot
+To enable us understand the proportion of the data that is explained by the principal components it is important to plot a screeplot.
+
+```{r}
+## To get variance we simply square standard deviation which is a component of prcomp
+pr.var <- (pr.std$sdev^2)
+pve <- pr.var/sum(pr.var)
+
+
+## Plotting variance against principal components
+plot(pve,xlab = "Principal Component",ylab = "Proportion of Variance Explained",ylim = c(0,1),type = "b")
+
+```
+
+### Scatter plot
+
+```{r}
+plot_dat <- cbind(as.data.frame(pr.std$x[,1:2]),labels = df[,1])
+ggplot(plot_dat,aes(x = PC1,y = PC2, colour = labels))+geom_point()
+```
+
+## Kmeans
+
+Clustering the data using K-Means algorithm.
+
+```{r}
+# Create a k-means model on data
+std.kmeans <- kmeans(scale(df),centers = 3,nstart = 20)
+
+
+summary(std.kmeans)
+
+```
+
+### Plot kmeans
+
+A visual represntation of the data presented across 3 distinct clusters based on their centroid locations yet having similar attributes within groups.
+
+```{r}
+
+p1 <- fviz_cluster(std.kmeans,geom = "point",data = df)+ ggtitle("k means for 3 clusters")
+p1
+```
+## Counclusion
+
+
+The output above evidently portrays data points clustered along the three distinct clusters. This gives a strong indication about the groupings that can be made out of the over 5k students in the class. It is probable that the groupings are along the lines of instructors who happen to be three and possibly having different teaching approaches. If this hypotheses is confirmed true, it could hint on the impact that tutoring has, not only on the ultimate goal of education (passing knowledge)but also that of student perceptions about the same process (student experience).   
